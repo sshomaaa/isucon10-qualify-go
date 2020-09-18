@@ -34,9 +34,9 @@ func getEstateDetail(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	var estate *Estate
-	if estate, ok := cacheEstate[int64(id)]; !ok {
-		err = dbe.Get(estate, "SELECT * FROM estate WHERE id = ?", id)
+	if _, ok := cacheEstate[int64(id)]; !ok {
+		var e Estate
+		err = dbe.Get(&e, "SELECT * FROM estate WHERE id = ?", id)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				c.Echo().Logger.Infof("getEstateDetail estate id %v not found", id)
@@ -45,9 +45,10 @@ func getEstateDetail(c echo.Context) error {
 			c.Echo().Logger.Errorf("Database Execution error : %v", err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		cacheEstate[estate.ID] = estate
+		cacheEstate[e.ID] = &e
 	}
 
+	estate := cacheEstate[int64(id)]
 	return c.JSON(http.StatusOK, estate)
 }
 
