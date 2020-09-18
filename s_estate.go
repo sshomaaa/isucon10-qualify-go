@@ -271,11 +271,12 @@ func searchEstateNazotte(c echo.Context) error {
 	}
 
 	estatesInPolygon := []Estate{}
+	coordinatesText :=  coordinates.coordinatesToText()
 	for _, estate := range estatesInBoundingBox {
 		validatedEstate := Estate{}
 
 		point := fmt.Sprintf("'POINT(%f %f)'", estate.Latitude, estate.Longitude)
-		query := fmt.Sprintf(`SELECT * FROM estate WHERE id = ? AND ST_Contains(ST_PolygonFromText(%s), ST_GeomFromText(%s))`, coordinates.coordinatesToText(), point)
+		query := fmt.Sprintf(`SELECT * FROM estate WHERE id = ? AND ST_Contains(ST_PolygonFromText(%s), ST_GeomFromText(%s))`, coordinatesText, point)
 		err = dbe.Get(&validatedEstate, query, estate.ID)
 		if err != nil {
 			if err == sql.ErrNoRows {
