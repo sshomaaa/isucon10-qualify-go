@@ -11,6 +11,22 @@ import (
 	"github.com/labstack/echo"
 )
 
+var (
+	cacheEstate map[int64]*Estate
+)
+
+func initEstateCache() error {
+	cacheEstate = map[int64]*Estate{}
+	var records []*Estate
+	if err := dbe.Select(&records, `SELECT * FROM estate`); err != nil {
+		return err
+	}
+	for _, r := range records {
+		cacheEstate[r.ID] = r
+	}
+	return nil
+}
+
 func getEstateDetail(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -18,15 +34,18 @@ func getEstateDetail(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	var estate Estate
-	err = dbe.Get(&estate, "SELECT * FROM estate WHERE id = ?", id)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			c.Echo().Logger.Infof("getEstateDetail estate id %v not found", id)
-			return c.NoContent(http.StatusNotFound)
+	var estate *Estate
+	if estate, ok := cacheEstate[int64(id)]; !ok {
+		err = dbe.Get(&estate, "SELECT * FROM estate WHERE id = ?", id)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.Echo().Logger.Infof("getEstateDetail estate id %v not found", id)
+				return c.NoContent(http.StatusNotFound)
+			}
+			c.Echo().Logger.Errorf("Database Execution error : %v", err)
+			return c.NoContent(http.StatusInternalServerError)
 		}
-		c.Echo().Logger.Errorf("Database Execution error : %v", err)
-		return c.NoContent(http.StatusInternalServerError)
+		cacheEstate[estate.ID] = estate
 	}
 
 	return c.JSON(http.StatusOK, estate)
