@@ -36,8 +36,7 @@ func getEstateDetail(c echo.Context) error {
 
 	var estate *Estate
 	if estate, ok := cacheEstate[int64(id)]; !ok {
-		c.Echo().Logger.Infof("cache not found, get=%v", id)
-		err = dbe.Get(&estate, "SELECT * FROM estate WHERE id = ?", id)
+		err = dbe.Get(estate, "SELECT * FROM estate WHERE id = ?", id)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				c.Echo().Logger.Infof("getEstateDetail estate id %v not found", id)
