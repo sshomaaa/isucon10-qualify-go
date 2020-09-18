@@ -88,7 +88,7 @@ func init() {
 func main() {
 	// Echo instance
 	e := echo.New()
-	e.Logger.SetLevel(log.WARN)
+	e.Logger.SetLevel(log.INFO)
 
 	// Middleware
 	e.Use(middleware.Logger())
