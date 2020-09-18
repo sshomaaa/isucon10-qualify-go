@@ -35,6 +35,11 @@ func initializeEstateDB(sqlDir string) error {
 			return err
 		}
 	}
+
+	if _, err := dbe.Exec("UPDATE estate SET popularity = -popularity"); err != nil {
+		return err
+	}
+
 	return nil
 }
 
