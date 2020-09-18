@@ -4,10 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -18,23 +15,22 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
-const Limit = 20
-const NazotteLimit = 50
+const (
+	dbMaxConn = 300
+	Limit = 20
+	NazotteLimit = 50
+)
 
-var db *sqlx.DB
-var mySQLConnectionData *MySQLConnectionEnv
-var chairSearchCondition ChairSearchCondition
-var estateSearchCondition EstateSearchCondition
+var (
+	dbeEnv *MySQLConnectionEnv
+	dbcEnv *MySQLConnectionEnv
 
-func NewMySQLConnectionEnv() *MySQLConnectionEnv {
-	return &MySQLConnectionEnv{
-		Host:     getEnv("MYSQL_HOST", "127.0.0.1"),
-		Port:     getEnv("MYSQL_PORT", "3306"),
-		User:     getEnv("MYSQL_USER", "isucon"),
-		DBName:   getEnv("MYSQL_DBNAME", "isuumo"),
-		Password: getEnv("MYSQL_PASS", "isucon"),
-	}
-}
+	dbe *sqlx.DB
+	dbc *sqlx.DB
+
+	chairSearchCondition ChairSearchCondition
+	estateSearchCondition EstateSearchCondition
+)
 
 func getEnv(key, defaultValue string) string {
 	val := os.Getenv(key)
@@ -42,6 +38,26 @@ func getEnv(key, defaultValue string) string {
 		return val
 	}
 	return defaultValue
+}
+
+func NewEstateDBConnectionEnv() *MySQLConnectionEnv {
+	return &MySQLConnectionEnv{
+		Host:     getEnv("MYSQL_HOST_ESTATE", "127.0.0.1"),
+		Port:     getEnv("MYSQL_PORT", "3306"),
+		User:     getEnv("MYSQL_USER", "isucon"),
+		DBName:   getEnv("MYSQL_DBNAME", "isuumo"),
+		Password: getEnv("MYSQL_PASS", "isucon"),
+	}
+}
+
+func NewChairDBConnectionEnv() *MySQLConnectionEnv {
+	return &MySQLConnectionEnv{
+		Host:     getEnv("MYSQL_HOST_CHAIR", "127.0.0.1"),
+		Port:     getEnv("MYSQL_PORT", "3306"),
+		User:     getEnv("MYSQL_USER", "isucon"),
+		DBName:   getEnv("MYSQL_DBNAME", "isuumo"),
+		Password: getEnv("MYSQL_PASS", "isucon"),
+	}
 }
 
 //ConnectDB isuumoデータベースに接続する
@@ -64,6 +80,9 @@ func init() {
 		os.Exit(1)
 	}
 	json.Unmarshal(jsonText, &estateSearchCondition)
+
+	dbeEnv = NewEstateDBConnectionEnv()
+	dbcEnv = NewChairDBConnectionEnv()
 }
 
 func main() {
@@ -96,48 +115,27 @@ func main() {
 	e.GET("/api/estate/search/condition", getEstateSearchCondition)
 	e.GET("/api/recommended_estate/:id", searchRecommendedEstateWithChair)
 
-	mySQLConnectionData = NewMySQLConnectionEnv()
-
 	var err error
-	db, err = mySQLConnectionData.ConnectDB()
+
+	// create connection to estate db.
+	dbe, err = dbeEnv.ConnectDB()
 	if err != nil {
 		e.Logger.Fatalf("DB connection failed : %v", err)
 	}
-	db.SetMaxOpenConns(10)
-	defer db.Close()
+	dbe.SetMaxOpenConns(dbMaxConn)
+	defer dbe.Close()
+
+	// create connection to chair db.
+	dbc, err = dbcEnv.ConnectDB()
+	if err != nil {
+		e.Logger.Fatalf("DB connection failed : %v", err)
+	}
+	dbc.SetMaxOpenConns(dbMaxConn)
+	defer dbc.Close()
 
 	// Start server
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_PORT", "1323"))
 	e.Logger.Fatal(e.Start(serverPort))
-}
-
-func initialize(c echo.Context) error {
-	sqlDir := filepath.Join("..", "mysql", "db")
-	paths := []string{
-		filepath.Join(sqlDir, "0_Schema.sql"),
-		filepath.Join(sqlDir, "1_DummyEstateData.sql"),
-		filepath.Join(sqlDir, "2_DummyChairData.sql"),
-	}
-
-	for _, p := range paths {
-		sqlFile, _ := filepath.Abs(p)
-		cmdStr := fmt.Sprintf("mysql -h %v -u %v -p%v -P %v %v < %v",
-			mySQLConnectionData.Host,
-			mySQLConnectionData.User,
-			mySQLConnectionData.Password,
-			mySQLConnectionData.Port,
-			mySQLConnectionData.DBName,
-			sqlFile,
-		)
-		if err := exec.Command("bash", "-c", cmdStr).Run(); err != nil {
-			c.Logger().Errorf("Initialize script error : %v", err)
-			return c.NoContent(http.StatusInternalServerError)
-		}
-	}
-
-	return c.JSON(http.StatusOK, InitializeResponse{
-		Language: "go",
-	})
 }
 
 func getRange(cond RangeCondition, rangeID string) (*Range, error) {
