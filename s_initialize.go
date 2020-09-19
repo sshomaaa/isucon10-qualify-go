@@ -51,7 +51,7 @@ func initializeChairDB(sqlDir string) error {
 			return err
 		}
 	}
-	if _, err := dbe.Exec("UPDATE chair SET popularity = -popularity"); err != nil {
+	if _, err := dbc.Exec("UPDATE chair SET popularity = -popularity"); err != nil {
 		return err
 	}
 	return nil
