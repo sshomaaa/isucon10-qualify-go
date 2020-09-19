@@ -108,6 +108,13 @@ func postEstate(c echo.Context) error {
 }
 
 func searchEstates(c echo.Context) error {
+	db, err := dbeEnv.ConnectDB()
+	if err != nil {
+		c.Echo().Logger.Errorf("failed to connect db, err=%+v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	defer db.Close()
+
 	conditions := make([]string, 0)
 	params := make([]interface{}, 0)
 
@@ -186,21 +193,15 @@ func searchEstates(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	searchQuery := "SELECT * FROM estate WHERE "
-	countQuery := "SELECT COUNT(*) FROM estate WHERE "
+	searchQuery := "SELECT SQL_CALC_FOUND_ROWS * FROM estate WHERE "
+	countQuery := "SELECT FOUND_ROWS()"
 	searchCondition := strings.Join(conditions, " AND ")
 	limitOffset := " ORDER BY popularity ASC, id ASC LIMIT ? OFFSET ?"
 
 	var res EstateSearchResponse
-	err = dbe.Get(&res.Count, countQuery+searchCondition, params...)
-	if err != nil {
-		c.Logger().Errorf("searchEstates DB execution error : %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
 
-	estates := []Estate{}
 	params = append(params, perPage, page*perPage)
-	err = dbe.Select(&estates, searchQuery+searchCondition+limitOffset, params...)
+	err = db.Select(&res.Estates, searchQuery+searchCondition+limitOffset, params...)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.JSON(http.StatusOK, EstateSearchResponse{Count: 0, Estates: []Estate{}})
@@ -209,7 +210,11 @@ func searchEstates(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	res.Estates = estates
+	err = db.Get(&res.Count, countQuery)
+	if err != nil {
+		c.Logger().Errorf("searchEstates DB execution error : %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
 
 	return c.JSON(http.StatusOK, res)
 }
