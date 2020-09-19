@@ -194,7 +194,6 @@ func searchEstates(c echo.Context) error {
 	}
 
 	searchQuery := "SELECT SQL_CALC_FOUND_ROWS * FROM estate WHERE "
-	countQuery := "SELECT FOUND_ROWS()"
 	searchCondition := strings.Join(conditions, " AND ")
 	limitOffset := " ORDER BY popularity ASC, id ASC LIMIT ? OFFSET ?"
 
@@ -212,7 +211,7 @@ func searchEstates(c echo.Context) error {
 	}
 	res.Estates = estates
 
-	err = db.Get(&res.Count, countQuery)
+	err = db.Get(&res.Count, `SELECT FOUND_ROWS()`)
 	if err != nil {
 		c.Logger().Errorf("searchEstates DB execution error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
