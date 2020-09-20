@@ -78,7 +78,7 @@ func postEstate(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	splitNum := 1000
+	splitNum := 100
 	totalLoop := len(records) / splitNum
 	isOverLoop := (len(records) % splitNum) != 0
 	var wg sync.WaitGroup
