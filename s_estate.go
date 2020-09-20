@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/labstack/echo"
 )
@@ -80,41 +81,49 @@ func postEstate(c echo.Context) error {
 	splitNum := 500
 	totalLoop := len(records) / splitNum
 	isOverLoop := (len(records) % splitNum) != 0
+	var wg sync.WaitGroup
 	for i := 0; i < totalLoop; i++ {
-		processingRecords := records[(i*splitNum):(i*splitNum+splitNum)]
-		var vStrings []string
-		var vArgs []interface{}
-		for _, row := range processingRecords {
-			rm := RecordMapper{Record: row}
-			id := rm.NextInt()
-			name := rm.NextString()
-			description := rm.NextString()
-			thumbnail := rm.NextString()
-			address := rm.NextString()
-			latitude := rm.NextFloat()
-			longitude := rm.NextFloat()
-			rent := rm.NextInt()
-			doorHeight := rm.NextInt()
-			doorWidth := rm.NextInt()
-			features := rm.NextString()
-			popularity := rm.NextInt()
-			if err := rm.Err(); err != nil {
-				c.Logger().Errorf("failed to read record: %v", err)
-				return c.NoContent(http.StatusBadRequest)
+		wg.Add(1)
+		go func(start int, end int, tx *sql.Tx) error {
+			defer wg.Done()
+			processingRecords := records[(i*splitNum):(i*splitNum+splitNum)]
+			var vStrings []string
+			var vArgs []interface{}
+			for _, row := range processingRecords {
+				rm := RecordMapper{Record: row}
+				id := rm.NextInt()
+				name := rm.NextString()
+				description := rm.NextString()
+				thumbnail := rm.NextString()
+				address := rm.NextString()
+				latitude := rm.NextFloat()
+				longitude := rm.NextFloat()
+				rent := rm.NextInt()
+				doorHeight := rm.NextInt()
+				doorWidth := rm.NextInt()
+				features := rm.NextString()
+				popularity := rm.NextInt()
+				if err := rm.Err(); err != nil {
+					c.Logger().Errorf("failed to read record: %v", err)
+					return c.NoContent(http.StatusBadRequest)
+				}
+
+				vStrings = append(vStrings, "(?,?,?,?,?,?,?,?,?,?,?,?)")
+				vArgs = append(vArgs, id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity)
 			}
 
-			vStrings = append(vStrings, "(?,?,?,?,?,?,?,?,?,?,?,?)")
-			vArgs = append(vArgs, id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity)
-		}
-
-		valueQuery := strings.Join(vStrings, ",")
-		query := "INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES " + valueQuery
-		_, err := tx.Exec(query, vArgs...)
-		if err != nil {
-			c.Logger().Errorf("failed to insert estate: %v", err)
-			return c.NoContent(http.StatusInternalServerError)
-		}
+			valueQuery := strings.Join(vStrings, ",")
+			query := "INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES " + valueQuery
+			_, err := tx.Exec(query, vArgs...)
+			if err != nil {
+				c.Logger().Errorf("failed to insert estate: %v", err)
+				return c.NoContent(http.StatusInternalServerError)
+			}
+			return nil
+		}(i*splitNum, i*splitNum+splitNum, tx)
 	}
+
+	wg.Wait()
 
 	if isOverLoop {
 		processingRecords := records[(totalLoop*splitNum):]
