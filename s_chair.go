@@ -3,9 +3,11 @@ package main
 import (
 	"database/sql"
 	"encoding/csv"
+	"github.com/labstack/gommon/log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo"
 )
@@ -36,6 +38,8 @@ func getChairDetail(c echo.Context) error {
 }
 
 func postChair(c echo.Context) error {
+	startTime := time.Now()
+
 	header, err := c.FormFile("chairs")
 	if err != nil {
 		c.Logger().Errorf("failed to get form file: %v", err)
@@ -59,35 +63,95 @@ func postChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	defer tx.Rollback()
-	for _, row := range records {
-		rm := RecordMapper{Record: row}
-		id := rm.NextInt()
-		name := rm.NextString()
-		description := rm.NextString()
-		thumbnail := rm.NextString()
-		price := rm.NextInt()
-		height := rm.NextInt()
-		width := rm.NextInt()
-		depth := rm.NextInt()
-		color := rm.NextString()
-		features := rm.NextString()
-		kind := rm.NextString()
-		popularity := rm.NextInt()
-		stock := rm.NextInt()
-		if err := rm.Err(); err != nil {
-			c.Logger().Errorf("failed to read record: %v", err)
-			return c.NoContent(http.StatusBadRequest)
+
+	totalRecordNum := len(records)
+	splitNum := 100
+	totalLoop := totalRecordNum / splitNum
+	isOverLoop := (totalRecordNum % splitNum) != 0
+	for i := 0; i < totalLoop; i++ {
+		start := i*splitNum
+		end := i*splitNum+splitNum
+		processingRecords := records[start:end]
+		var vStrings []string
+		var vArgs []interface{}
+		for _, row := range processingRecords {
+			rm := RecordMapper{Record: row}
+			id := rm.NextInt()
+			name := rm.NextString()
+			description := rm.NextString()
+			thumbnail := rm.NextString()
+			price := rm.NextInt()
+			height := rm.NextInt()
+			width := rm.NextInt()
+			depth := rm.NextInt()
+			color := rm.NextString()
+			features := rm.NextString()
+			kind := rm.NextString()
+			popularity := rm.NextInt()
+			stock := rm.NextInt()
+			if err := rm.Err(); err != nil {
+				log.Errorf("failed to read record: %v", err)
+				return c.NoContent(http.StatusBadRequest)
+			}
+
+			vStrings = append(vStrings, "(?,?,?,?,?,?,?,?,?,?,?,?,?)")
+			vArgs = append(vArgs, id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock)
 		}
-		_, err := tx.Exec("INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock)
+
+		valueQuery := strings.Join(vStrings, ",")
+		query := "INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock) VALUES " + valueQuery
+		_, err := tx.Exec(query, vArgs...)
 		if err != nil {
-			c.Logger().Errorf("failed to insert chair: %v", err)
+			log.Errorf("failed to insert chair: %v", err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
 	}
+
+	if isOverLoop {
+		processingRecords := records[(totalLoop*splitNum):]
+		var vStrings []string
+		var vArgs []interface{}
+		for _, row := range processingRecords {
+			rm := RecordMapper{Record: row}
+			id := rm.NextInt()
+			name := rm.NextString()
+			description := rm.NextString()
+			thumbnail := rm.NextString()
+			price := rm.NextInt()
+			height := rm.NextInt()
+			width := rm.NextInt()
+			depth := rm.NextInt()
+			color := rm.NextString()
+			features := rm.NextString()
+			kind := rm.NextString()
+			popularity := rm.NextInt()
+			stock := rm.NextInt()
+			if err := rm.Err(); err != nil {
+				log.Errorf("failed to read record: %v", err)
+				return c.NoContent(http.StatusBadRequest)
+			}
+
+			vStrings = append(vStrings, "(?,?,?,?,?,?,?,?,?,?,?,?,?)")
+			vArgs = append(vArgs, id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock)
+		}
+
+		valueQuery := strings.Join(vStrings, ",")
+		query := "INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock) VALUES " + valueQuery
+		_, err := tx.Exec(query, vArgs...)
+		if err != nil {
+			log.Errorf("failed to insert chair: %v", err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		c.Logger().Errorf("failed to commit tx: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+
+	elapsed := time.Since(startTime)
+	log.Infof("postChair elapsed, %d %s", totalRecordNum, elapsed)
+
 	return c.NoContent(http.StatusCreated)
 }
 

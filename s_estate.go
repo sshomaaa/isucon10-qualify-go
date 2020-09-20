@@ -57,11 +57,6 @@ func getEstateDetail(c echo.Context) error {
 func postEstate(c echo.Context) error {
 	startTime := time.Now()
 
-	db, err := dbeEnv.ConnectDB()
-	if err != nil {
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
 	header, err := c.FormFile("estates")
 	if err != nil {
 		c.Logger().Errorf("failed to get form file: %v", err)
@@ -79,7 +74,7 @@ func postEstate(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	tx, err := db.Begin()
+	tx, err := dbe.Begin()
 	if err != nil {
 		c.Logger().Errorf("failed to begin tx: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
@@ -90,11 +85,7 @@ func postEstate(c echo.Context) error {
 	splitNum := 100
 	totalLoop := totalRecordNum / splitNum
 	isOverLoop := (totalRecordNum % splitNum) != 0
-	//var wg sync.WaitGroup
 	for i := 0; i < totalLoop; i++ {
-		//wg.Add(1)
-		//go func(start int, end int, tx *sql.Tx) error {
-		//	defer wg.Done()
 		start := i*splitNum
 		end := i*splitNum+splitNum
 		processingRecords := records[start:end]
@@ -115,7 +106,6 @@ func postEstate(c echo.Context) error {
 			features := rm.NextString()
 			popularity := rm.NextInt()
 			if err := rm.Err(); err != nil {
-				//c.Logger().Errorf("failed to read record: %v", err)
 				return c.NoContent(http.StatusBadRequest)
 			}
 
@@ -127,14 +117,9 @@ func postEstate(c echo.Context) error {
 		query := "INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES " + valueQuery
 		_, err := tx.Exec(query, vArgs...)
 		if err != nil {
-			//c.Logger().Errorf("failed to insert estate: %v", err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
-			//return nil
-		//}(i*splitNum, i*splitNum+splitNum, tx)
 	}
-
-	//wg.Wait()
 
 	if isOverLoop {
 		processingRecords := records[(totalLoop*splitNum):]
@@ -171,31 +156,6 @@ func postEstate(c echo.Context) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 	}
-
-	//for _, row := range records {
-	//	rm := RecordMapper{Record: row}
-	//	id := rm.NextInt()
-	//	name := rm.NextString()
-	//	description := rm.NextString()
-	//	thumbnail := rm.NextString()
-	//	address := rm.NextString()
-	//	latitude := rm.NextFloat()
-	//	longitude := rm.NextFloat()
-	//	rent := rm.NextInt()
-	//	doorHeight := rm.NextInt()
-	//	doorWidth := rm.NextInt()
-	//	features := rm.NextString()
-	//	popularity := rm.NextInt()
-	//	if err := rm.Err(); err != nil {
-	//		c.Logger().Errorf("failed to read record: %v", err)
-	//		return c.NoContent(http.StatusBadRequest)
-	//	}
-	//	_, err := tx.Exec("INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity)
-	//	if err != nil {
-	//		c.Logger().Errorf("failed to insert estate: %v", err)
-	//		return c.NoContent(http.StatusInternalServerError)
-	//	}
-	//}
 
 	if err := tx.Commit(); err != nil {
 		c.Logger().Errorf("failed to commit tx: %v", err)
