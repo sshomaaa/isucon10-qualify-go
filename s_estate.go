@@ -77,7 +77,7 @@ func postEstate(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	splitNum := 200
+	splitNum := 500
 	totalLoop := len(records) / splitNum
 	isOverLoop := (len(records) % splitNum) != 0
 	for i := 0; i < totalLoop; i++ {
