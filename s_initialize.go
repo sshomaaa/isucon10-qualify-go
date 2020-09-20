@@ -51,11 +51,6 @@ func initializeChairDB(sqlDir string) error {
 	return nil
 }
 
-func initializeEstatePoint() error {
-	_, err := dbe.Exec("INSERT INTO estate_point(id, point) SELECT id, POINT(latitude, longitude) FROM estate")
-	return err
-}
-
 func initialize(c echo.Context) error {
 	sqlDir := filepath.Join("..", "mysql", "db")
 
@@ -65,11 +60,6 @@ func initialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	if err := initializeChairDB(sqlDir); err != nil {
-		c.Logger().Errorf("Initialize script error : %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
-	if err := initializeEstatePoint(); err != nil {
 		c.Logger().Errorf("Initialize script error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
