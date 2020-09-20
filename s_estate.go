@@ -78,13 +78,14 @@ func postEstate(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	splitNum := 500
+	splitNum := 1000
 	totalLoop := len(records) / splitNum
 	isOverLoop := (len(records) % splitNum) != 0
 	var wg sync.WaitGroup
 	for i := 0; i < totalLoop; i++ {
 		wg.Add(1)
 		go func(start int, end int, tx *sql.Tx) error {
+			c.Logger().Info("postEstate,start start=%v,end=%v", start, end)
 			defer wg.Done()
 			processingRecords := records[start:end]
 			var vStrings []string
@@ -119,6 +120,7 @@ func postEstate(c echo.Context) error {
 				c.Logger().Errorf("failed to insert estate: %v", err)
 				return c.NoContent(http.StatusInternalServerError)
 			}
+			c.Logger().Info("postEstate,end start=%v,end=%v", start, end)
 			return nil
 		}(i*splitNum, i*splitNum+splitNum, tx)
 	}
