@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/labstack/echo"
@@ -56,7 +55,12 @@ func getEstateDetail(c echo.Context) error {
 }
 
 func postEstate(c echo.Context) error {
-	start := time.Now()
+	startTime := time.Now()
+
+	db, err := dbeEnv.ConnectDB()
+	if err != nil {
+		return c.NoContent(http.StatusInternalServerError)
+	}
 
 	header, err := c.FormFile("estates")
 	if err != nil {
@@ -75,7 +79,7 @@ func postEstate(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	tx, err := dbe.Begin()
+	tx, err := db.Begin()
 	if err != nil {
 		c.Logger().Errorf("failed to begin tx: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
@@ -86,49 +90,51 @@ func postEstate(c echo.Context) error {
 	splitNum := 100
 	totalLoop := totalRecordNum / splitNum
 	isOverLoop := (totalRecordNum % splitNum) != 0
-	var wg sync.WaitGroup
+	//var wg sync.WaitGroup
 	for i := 0; i < totalLoop; i++ {
-		wg.Add(1)
-		go func(start int, end int, tx *sql.Tx) error {
-			defer wg.Done()
-			processingRecords := records[start:end]
-			var vStrings []string
-			var vArgs []interface{}
-			for _, row := range processingRecords {
-				rm := RecordMapper{Record: row}
-				id := rm.NextInt()
-				name := rm.NextString()
-				description := rm.NextString()
-				thumbnail := rm.NextString()
-				address := rm.NextString()
-				latitude := rm.NextFloat()
-				longitude := rm.NextFloat()
-				rent := rm.NextInt()
-				doorHeight := rm.NextInt()
-				doorWidth := rm.NextInt()
-				features := rm.NextString()
-				popularity := rm.NextInt()
-				if err := rm.Err(); err != nil {
-					c.Logger().Errorf("failed to read record: %v", err)
-					return c.NoContent(http.StatusBadRequest)
-				}
-
-				vStrings = append(vStrings, "(?,?,?,?,?,?,?,?,?,?,?,?)")
-				vArgs = append(vArgs, id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity)
+		//wg.Add(1)
+		//go func(start int, end int, tx *sql.Tx) error {
+		//	defer wg.Done()
+		start := i*splitNum
+		end := i*splitNum+splitNum
+		processingRecords := records[start:end]
+		var vStrings []string
+		var vArgs []interface{}
+		for _, row := range processingRecords {
+			rm := RecordMapper{Record: row}
+			id := rm.NextInt()
+			name := rm.NextString()
+			description := rm.NextString()
+			thumbnail := rm.NextString()
+			address := rm.NextString()
+			latitude := rm.NextFloat()
+			longitude := rm.NextFloat()
+			rent := rm.NextInt()
+			doorHeight := rm.NextInt()
+			doorWidth := rm.NextInt()
+			features := rm.NextString()
+			popularity := rm.NextInt()
+			if err := rm.Err(); err != nil {
+				//c.Logger().Errorf("failed to read record: %v", err)
+				return c.NoContent(http.StatusBadRequest)
 			}
 
-			valueQuery := strings.Join(vStrings, ",")
-			query := "INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES " + valueQuery
-			_, err := tx.Exec(query, vArgs...)
-			if err != nil {
-				c.Logger().Errorf("failed to insert estate: %v", err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
-			return nil
-		}(i*splitNum, i*splitNum+splitNum, tx)
+			vStrings = append(vStrings, "(?,?,?,?,?,?,?,?,?,?,?,?)")
+			vArgs = append(vArgs, id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity)
+		}
+
+		valueQuery := strings.Join(vStrings, ",")
+		query := "INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES " + valueQuery
+		_, err := tx.Exec(query, vArgs...)
+		if err != nil {
+			//c.Logger().Errorf("failed to insert estate: %v", err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+			//return nil
+		//}(i*splitNum, i*splitNum+splitNum, tx)
 	}
 
-	wg.Wait()
+	//wg.Wait()
 
 	if isOverLoop {
 		processingRecords := records[(totalLoop*splitNum):]
@@ -196,7 +202,7 @@ func postEstate(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	elapsed := time.Since(start)
+	elapsed := time.Since(startTime)
 	log.Infof("postEstate elapsed, %d %s", totalRecordNum, elapsed)
 
 	return c.NoContent(http.StatusCreated)
