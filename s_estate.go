@@ -86,7 +86,7 @@ func postEstate(c echo.Context) error {
 		wg.Add(1)
 		go func(start int, end int, tx *sql.Tx) error {
 			defer wg.Done()
-			processingRecords := records[(i*splitNum):(i*splitNum+splitNum)]
+			processingRecords := records[start:end]
 			var vStrings []string
 			var vArgs []interface{}
 			for _, row := range processingRecords {
