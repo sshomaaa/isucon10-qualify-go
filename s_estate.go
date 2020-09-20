@@ -82,9 +82,10 @@ func postEstate(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
+	totalRecordNum := len(records)
 	splitNum := 100
-	totalLoop := len(records) / splitNum
-	isOverLoop := (len(records) % splitNum) != 0
+	totalLoop := totalRecordNum / splitNum
+	isOverLoop := (totalRecordNum % splitNum) != 0
 	var wg sync.WaitGroup
 	for i := 0; i < totalLoop; i++ {
 		wg.Add(1)
@@ -196,7 +197,7 @@ func postEstate(c echo.Context) error {
 	}
 
 	elapsed := time.Since(start)
-	log.Infof("postEstate elapsed, %s", elapsed)
+	log.Infof("postEstate elapsed, %d %s", totalRecordNum, elapsed)
 
 	return c.NoContent(http.StatusCreated)
 }
