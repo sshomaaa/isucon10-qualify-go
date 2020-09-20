@@ -8,8 +8,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/labstack/echo"
+	"github.com/labstack/gommon/log"
 )
 
 var (
@@ -54,6 +56,8 @@ func getEstateDetail(c echo.Context) error {
 }
 
 func postEstate(c echo.Context) error {
+	start := time.Now()
+
 	header, err := c.FormFile("estates")
 	if err != nil {
 		c.Logger().Errorf("failed to get form file: %v", err)
@@ -85,7 +89,6 @@ func postEstate(c echo.Context) error {
 	for i := 0; i < totalLoop; i++ {
 		wg.Add(1)
 		go func(start int, end int, tx *sql.Tx) error {
-			c.Logger().Info("postEstate,start start=%v,end=%v", start, end)
 			defer wg.Done()
 			processingRecords := records[start:end]
 			var vStrings []string
@@ -120,7 +123,6 @@ func postEstate(c echo.Context) error {
 				c.Logger().Errorf("failed to insert estate: %v", err)
 				return c.NoContent(http.StatusInternalServerError)
 			}
-			c.Logger().Info("postEstate,end start=%v,end=%v", start, end)
 			return nil
 		}(i*splitNum, i*splitNum+splitNum, tx)
 	}
@@ -192,6 +194,10 @@ func postEstate(c echo.Context) error {
 		c.Logger().Errorf("failed to commit tx: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+
+	elapsed := time.Since(start)
+	log.Infof("postEstate elapsed, %s", elapsed)
+
 	return c.NoContent(http.StatusCreated)
 }
 
