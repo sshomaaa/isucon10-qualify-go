@@ -18,6 +18,7 @@ type Chair struct {
 	Kind        string `db:"kind" json:"kind"`
 	Popularity  int64  `db:"popularity" json:"-"`
 	Stock       int64  `db:"stock" json:"-"`
+	DPopularity int64  `db:"dpopularity" json:"-"`
 }
 
 type ChairSearchResponse struct {
@@ -43,6 +44,7 @@ type Estate struct {
 	DoorWidth   int64   `db:"door_width" json:"doorWidth"`
 	Features    string  `db:"features" json:"features"`
 	Popularity  int64   `db:"popularity" json:"-"`
+	DPopularity int64   `db:"dpopularity" json:"-"`
 }
 
 //EstateSearchResponse estate/searchへのレスポンスの形式
