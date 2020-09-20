@@ -208,7 +208,7 @@ func searchChairs(c echo.Context) error {
 
 	searchQuery := "SELECT SQL_CALC_FOUND_ROWS * FROM chair WHERE "
 	searchCondition := strings.Join(conditions, " AND ")
-	limitOffset := " ORDER BY popularity ASC, id ASC LIMIT ? OFFSET ?"
+	limitOffset := " ORDER BY dpopularity ASC, id ASC LIMIT ? OFFSET ?"
 
 	var res ChairSearchResponse
 

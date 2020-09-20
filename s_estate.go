@@ -195,7 +195,7 @@ func searchEstates(c echo.Context) error {
 
 	searchQuery := "SELECT SQL_CALC_FOUND_ROWS * FROM estate WHERE "
 	searchCondition := strings.Join(conditions, " AND ")
-	limitOffset := " ORDER BY popularity ASC, id ASC LIMIT ? OFFSET ?"
+	limitOffset := " ORDER BY dpopularity ASC, id ASC LIMIT ? OFFSET ?"
 
 	var res EstateSearchResponse
 
@@ -295,7 +295,7 @@ func searchEstateNazotte(c echo.Context) error {
 			AND longitude <= ?
 			AND longitude >= ?
 			AND ST_Contains(ST_PolygonFromText(%s), p.point)
-		ORDER BY popularity ASC, id ASC
+		ORDER BY dpopularity ASC, id ASC
 	`, coordinatesText)
 
 	b := coordinates.getBoundingBox()
