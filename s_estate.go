@@ -286,15 +286,14 @@ func searchEstateNazotte(c echo.Context) error {
 
 	coordinatesText :=  coordinates.coordinatesToText()
 	query := fmt.Sprintf(`
-		SELECT e.*
-		FROM estate e
-		INNER JOIN estate_point p ON e.id = p.id
+		SELECT *
+		FROM estate
 		WHERE
 			latitude <= ?
 			AND latitude >= ?
 			AND longitude <= ?
 			AND longitude >= ?
-			AND ST_Contains(ST_PolygonFromText(%s), p.point)
+			AND ST_Contains(ST_PolygonFromText(%s), point)
 		ORDER BY dpopularity ASC, id ASC
 	`, coordinatesText)
 
